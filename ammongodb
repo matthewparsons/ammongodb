@@ -1,0 +1,68 @@
+#!/usr/bin/env perl
+
+# Invoked by AMANDA backup plugin as :
+#   Spawning "/usr/libexec/amanda/application/ammongodb ammongodb POST-DLE-BACKUP --execute-where client --config DailyBackup --host example.domain.net --disk /var/mongo/dump --device /var/mongo/dump --level 0 --port 27018 --auth /var/mongo/auth/mongo_backup_auth.cfg --log /var/log/mongo/mongo-amanda.log"
+
+use Getopt::Long;
+use File::Path;
+$|=1;
+
+GetOptions (	"execute-where=s" => \$where,
+			"config=s" => \$config,
+			"host=s"   => \$host,
+			"disk=s"   => \$disk,
+			"device=s" => \$device,
+			"level=i"  => \$level,
+			"auth=s"   => \$authFile,
+			"log=s"    => \$logFile,
+			"port=i"   => \$port,
+			"database=s" => \$database) || die "Incorrect options passed to script\n";
+use POSIX qw/strftime/;
+my $dateString = strftime "%d/%m/%Y %H:%M:%S", localtime;
+open(LOG,">$logFile") || die "Cannot open log file $logFile for writing\n";
+select LOG;
+$dle = $ARGV[0];
+
+sub pre_backup {
+	print "$dateString === Mongo backup started ===\n";
+	open(CFG,"<$authFile") || print "Cannot open config file $authFile\n";
+	while(<CFG>) {
+		if (/^([^=]+)=(.+)$/) {
+			$$1 = $2;
+		}
+	}
+	close CFG;
+	if ( $port == "27018" ) {
+		$opLog = "--oplog";
+	}
+	$mongoBackupCmd = "/usr/bin/mongodump --host $host:$port -u $USER -p $PASSWD $database $opLog -o $disk 2>&1";
+	open (CMD,"$mongoBackupCmd|") || die "Cannot execute command:\n $mongoBackupCmd\n";
+	while (<CMD>) {
+		print;
+	}
+	close CMD;
+	if ( $? != 0 ){
+		exit 1;
+	}
+}
+
+sub post_backup {
+	print "$dateString === Mongo backup cleanup ===\n";
+	if ( -d "$disk") {
+		print "Deleting directory $disk\n";
+		rmtree "$disk" || warn "Could not delete $disk";
+	} else {
+		print "Directory $disk does not exist\n";
+	}
+}
+
+if ( $dle eq "PRE-DLE-BACKUP") {
+	pre_backup()
+} elsif ( $dle eq "POST-DLE-BACKUP") {
+	post_backup()
+} else {
+	die "No DLE-BACKUP parameter set; exiting\n";
+}
+
+close LOG;
+
