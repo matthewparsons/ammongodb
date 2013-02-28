@@ -27,7 +27,7 @@ sub pre_backup {
 	print "$dateString === Mongo backup started ===\n";
 	open(CFG,"<$authFile") || print "Cannot open config file $authFile\n";
 	while(<CFG>) {
-		if (/^([^=]+)=(.+)$/) {
+		if (/^(USER|PASSWD)=(.+)$/) {
 			$$1 = $2;
 		}
 	}
@@ -36,6 +36,7 @@ sub pre_backup {
 		$opLog = "--oplog";
 	}
 	$mongoBackupCmd = "/usr/bin/mongodump --host $host:$port -u $USER -p $PASSWD $database $opLog -o $disk 2>&1";
+	print "Executing $mongoBackupCmd\n";
 	open (CMD,"$mongoBackupCmd|") || die "Cannot execute command:\n $mongoBackupCmd\n";
 	while (<CMD>) {
 		print;
