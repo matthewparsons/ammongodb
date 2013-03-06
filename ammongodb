@@ -6,6 +6,7 @@
 use Getopt::Long;
 use File::Path;
 $|=1;
+my $dump = "mongo-backup-dump";
 
 GetOptions (	"execute-where=s" => \$where,
 			"config=s" => \$config,
@@ -35,7 +36,7 @@ sub pre_backup {
 	if ( $port == "27018" ) {
 		$opLog = "--oplog";
 	}
-	$mongoBackupCmd = "/usr/bin/mongodump --host $host:$port -u $USER -p $PASSWD $database $opLog -o $disk 2>&1";
+	$mongoBackupCmd = "/usr/bin/mongodump --host $host:$port -u $USER -p $PASSWD $database $opLog -o $disk/$dump 2>&1";
 	print "Executing $mongoBackupCmd\n";
 	open (CMD,"$mongoBackupCmd|") || die "Cannot execute command:\n $mongoBackupCmd\n";
 	while (<CMD>) {
@@ -49,11 +50,11 @@ sub pre_backup {
 
 sub post_backup {
 	print "$dateString === Mongo backup cleanup ===\n";
-	if ( -d "$disk") {
-		print "Deleting directory $disk\n";
-		rmtree "$disk" || warn "Could not delete $disk";
+	if ( -d "$disk/$dump") {
+		print "Deleting directory $disk/$dump\n";
+		rmtree "$disk/$dump" || warn "Could not delete $disk/$dump";
 	} else {
-		print "Directory $disk does not exist\n";
+		print "Directory $disk/$dump does not exist\n";
 	}
 }
 
