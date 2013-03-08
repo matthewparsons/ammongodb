@@ -7,7 +7,7 @@ Sources
 -------
 * Mongo Backups: http://docs.mongodb.org/manual/administration/backups/
 * AMANDA script API: http://wiki.zmanda.com/index.php/Script_API 
-_x
+
 Usage
 -----
 This script will be called by the AMANDA plugin API, snd should not be invoked directly.  The configuration file "amanda.conf" defines the input arguments in the "script-tool" and "dumptype" sections. 
@@ -52,4 +52,4 @@ The AMANDA "execute-on" key will take several values, but the ammongodb script w
 
 * pre-dle-backup:  execute the <code>mongodump</code> command, dumping to the disk subdirectory mongo-backup-dump, backing up this directory to the AMANDA datastore.
 * post-dle-backup: delete the mongo-backup-dump subdirectory
-* log: file containing the backup script output; logs are also to be found in <code>/var/log/amanda/client/<config>/sendbackup*</code>.
+* log: file containing the backup script output; logs are also to be found in <code>/var/log/amanda/client/Config/sendbackup*</code>.
