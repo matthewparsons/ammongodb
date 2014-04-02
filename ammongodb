@@ -5,21 +5,25 @@
 #
 # Requires the following permissions in sudoers
 # Cmnd_Alias DEPLOYMENT_MANAGER = /var/sky/mongo/scripts/backup/mongo_backup.sh, \
-# 							/sbin/service mongod *, \
-#               /sbin/lvcreate -s -n mongo-snap -L * /dev/vgdb/lvol1, \
-#               /sbin/lvremove -f /dev/vgdb/mongo-snap, \
-#								/sbin/lvdisplay *, \
-#								/bin/umount /dev/vgdb/mongo-snap, \
-#								/bin/mount /dev/vgdb/mongo-snap * 
+#    /sbin/service mongod *, \
+#    /sbin/lvcreate -s -n mongo-snap -L * /dev/vgdb/lvol1, \
+#    /sbin/lvremove -f /dev/vgdb/mongo-snap, \
+#		 /sbin/lvdisplay *, \
+#    /bin/umount /dev/vgdb/mongo-snap, \
+#		 /bin/mount /dev/vgdb/mongo-snap * 
 #
 
 use Getopt::Long;
 use File::Path;
 $|=1;
+<<<<<<< HEAD
 #my $dump = "mongo-backup-dump";
 my $vgPath = "/dev/vgdb";
 my $snapshotVolume = "mongosnap";
 my $snapMount = "/var/snapshot";
+=======
+my $dump = "mongo-backup-dump";
+>>>>>>> 89fab05d147bcd3a1b69151c563ccfa006fa1c59
 
 GetOptions ("execute-where=s" => \$where,
                         "config=s" => \$config,
@@ -68,8 +72,18 @@ sub pre_backup {
 		}
 		$prebackupCmd = "/usr/bin/mongodump --host $host:$port -u $USER -p $PASSWD $database $opLog -o $disk/$dump 2>&1";
 	}
+<<<<<<< HEAD
 #	print STDERR "Executing pre-backup Command:\n$prebackupCmd\n";
 	open (CMD,"$prebackupCmd|") || die "Cannot execute command:\n $prebackupCmd\n";
+=======
+	close CFG;
+	if ( $port == "27018" ) {
+		$opLog = "--oplog";
+	}
+	$mongoBackupCmd = "/usr/bin/mongodump --host $host:$port -u $USER -p $PASSWD $database $opLog -o $disk/$dump 2>&1";
+	print "Executing $mongoBackupCmd\n";
+	open (CMD,"$mongoBackupCmd|") || die "Cannot execute command:\n $mongoBackupCmd\n";
+>>>>>>> 89fab05d147bcd3a1b69151c563ccfa006fa1c59
 	while (<CMD>) {
 		print;
 	}
@@ -82,6 +96,7 @@ sub pre_backup {
 sub post_backup {
 	my $method = $_[0];
 	print "$dateString === Mongo backup cleanup ===\n";
+<<<<<<< HEAD
 
 	if ($method eq "snapshot") {
 		$postbackupCmd = "sudo /bin/umount $snapMount && sudo /sbin/lvremove -f $vgPath/$snapshotVolume";
@@ -101,6 +116,13 @@ sub post_backup {
 		} else {
 			print "Directory $disk/$dump does not exist\n";
 		}
+=======
+	if ( -d "$disk/$dump") {
+		print "Deleting directory $disk/$dump\n";
+		rmtree "$disk/$dump" || warn "Could not delete $disk/$dump";
+	} else {
+		print "Directory $disk/$dump does not exist\n";
+>>>>>>> 89fab05d147bcd3a1b69151c563ccfa006fa1c59
 	}
 }
 
