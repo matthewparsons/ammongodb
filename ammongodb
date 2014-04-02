@@ -2,6 +2,16 @@
 
 # Invoked by AMANDA backup plugin as :
 #   Spawning "/usr/libexec/amanda/application/ammongodb ammongodb POST-DLE-BACKUP --execute-where client --config DailyBackup --host example.domain.net --disk /var/mongo/dump --device /var/mongo/dump --level 0 --port 27018 --auth /var/mongo/auth/mongo_backup_auth.cfg --log /var/log/mongo/mongo-amanda.log"
+#
+# Requires the following permissions in sudoers
+# Cmnd_Alias DEPLOYMENT_MANAGER = /var/sky/mongo/scripts/backup/mongo_backup.sh, \
+# 							/sbin/service mongod *, \
+#               /sbin/lvcreate -s -n mongo-snap -L * /dev/vgdb/lvol1, \
+#               /sbin/lvremove -f /dev/vgdb/mongo-snap, \
+#								/sbin/lvdisplay *, \
+#								/bin/umount /dev/vgdb/mongo-snap, \
+#								/bin/mount /dev/vgdb/mongo-snap * 
+#
 
 use Getopt::Long;
 use File::Path;
