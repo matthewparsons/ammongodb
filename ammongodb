@@ -6,38 +6,60 @@
 use Getopt::Long;
 use File::Path;
 $|=1;
+#my $dump = "mongo-backup-dump";
+my $vgPath = "/dev/vgdb";
+my $snapshotVolume = "mongosnap";
+my $snapMount = "/var/snapshot";
 
-GetOptions (	"execute-where=s" => \$where,
-			"config=s" => \$config,
-			"host=s"   => \$host,
-			"disk=s"   => \$disk,
-			"device=s" => \$device,
-			"level=i"  => \$level,
-			"auth=s"   => \$authFile,
-			"log=s"    => \$logFile,
-			"port=i"   => \$port,
-			"database=s" => \$database) || die "Incorrect options passed to script\n";
+GetOptions ("execute-where=s" => \$where,
+                        "config=s" => \$config,
+                        "host=s"   => \$host,
+                        "disk=s"   => \$disk,
+                        "device=s" => \$device,
+                        "level=i"  => \$level,
+                        "auth=s"   => \$authFile,
+                        "log=s"    => \$logFile,
+                        "volume=s" => \$volume,
+                        "port=i"   => \$port,
+                        "method=s" => \$method,
+                        "database=s" => \$database) || die "Incorrect options passed to script\n";
 use POSIX qw/strftime/;
 my $dateString = strftime "%d/%m/%Y %H:%M:%S", localtime;
-open(LOG,">$logFile") || die "Cannot open log file $logFile for writing\n";
+open(LOG,">>$logFile") || die "Cannot open log file $logFile for writing\n";
 select LOG;
 $dle = $ARGV[0];
+(my $vgName,$logicalVol) = ($volume =~ m#/dev/([^/]+)/([^/]+)# );
+my $vgPath = "/dev/".$vgName;
 
 sub pre_backup {
+	my $method = $_[0];
 	print "$dateString === Mongo backup started ===\n";
-	open(CFG,"<$authFile") || print "Cannot open config file $authFile\n";
-	while(<CFG>) {
-		if (/^(USER|PASSWD)=(.+)$/) {
-			$$1 = $2;
+
+	if ($method eq "snapshot") {
+		$snapshotCheck = "sudo /sbin/lvdisplay $vgPath/$snapshotVolume 2>/dev/null";
+		my $output = `$snapshotCheck`;
+		if ( $output =~ /LV Status\s+available/) {
+#			print STDERR "Snapshot $snapshotVolume already exists\n";
+			$destroySnapshot = "sudo /bin/umount $snapMount 2>/dev/null ; sudo /sbin/lvremove -f $vgPath/$snapshotVolume";
+			my $output = `$destroySnapshot`;
+#			print STDERR "Outcome of snapshot destruction:\n$output\n";
 		}
+		$prebackupCmd = "sudo /sbin/lvcreate -l 100 -s -n $snapshotVolume $vgPath/lvol1 && sudo /bin/mount $vgPath/$snapshotVolume $snapMount"	
+	} else {
+		open(CFG,"<$authFile") || print "Cannot open config file $authFile\n";
+		while(<CFG>) {
+			if (/^(USER|PASSWD)=(.+)$/) {
+				$$1 = $2;
+			}
+		}
+		close CFG;
+		if ( $port == "27018" ) {
+			$opLog = "--oplog";
+		}
+		$prebackupCmd = "/usr/bin/mongodump --host $host:$port -u $USER -p $PASSWD $database $opLog -o $disk/$dump 2>&1";
 	}
-	close CFG;
-	if ( $port == "27018" ) {
-		$opLog = "--oplog";
-	}
-	$mongoBackupCmd = "/usr/bin/mongodump --host $host:$port -u $USER -p $PASSWD $database $opLog -o $disk 2>&1";
-	print "Executing $mongoBackupCmd\n";
-	open (CMD,"$mongoBackupCmd|") || die "Cannot execute command:\n $mongoBackupCmd\n";
+#	print STDERR "Executing pre-backup Command:\n$prebackupCmd\n";
+	open (CMD,"$prebackupCmd|") || die "Cannot execute command:\n $prebackupCmd\n";
 	while (<CMD>) {
 		print;
 	}
@@ -48,19 +70,34 @@ sub pre_backup {
 }
 
 sub post_backup {
+	my $method = $_[0];
 	print "$dateString === Mongo backup cleanup ===\n";
-	if ( -d "$disk") {
-		print "Deleting directory $disk\n";
-		rmtree "$disk" || warn "Could not delete $disk";
+
+	if ($method eq "snapshot") {
+		$postbackupCmd = "sudo /bin/umount $snapMount && sudo /sbin/lvremove -f $vgPath/$snapshotVolume";
+#		print STDERR "Executing post-backup command:\n$postbackupCmd\n";
+		open (CMD,"$postbackupCmd|") || die "Cannot execute command:\n $postbackupCmd\n";
+		while (<CMD>) {
+			print;
+		}
+		close CMD;
+		if ( $? != 0 ){
+			exit 1;
+		}
 	} else {
-		print "Directory $disk does not exist\n";
+		if ( -d "$disk/$dump") {
+			print "Deleting directory $disk/$dump\n";
+			rmtree "$disk/$dump" || warn "Could not delete $disk/$dump";
+		} else {
+			print "Directory $disk/$dump does not exist\n";
+		}
 	}
 }
 
 if ( $dle eq "PRE-DLE-BACKUP") {
-	pre_backup()
+	pre_backup($method)
 } elsif ( $dle eq "POST-DLE-BACKUP") {
-	post_backup()
+	post_backup($method)
 } else {
 	die "No DLE-BACKUP parameter set; exiting\n";
 }
